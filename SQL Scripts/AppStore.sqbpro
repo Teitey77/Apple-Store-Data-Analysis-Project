@@ -1,0 +1,237 @@
+<?xml version="1.0" encoding="UTF-8"?><sqlb_project><db path="C:/Users/adams/OneDrive/Desktop/Data Ananlysis/SQL/Project 2/AppStore.db" readonly="0" foreign_keys="1" case_sensitive_like="0" temp_store="0" wal_autocheckpoint="1000" synchronous="2"/><attached/><window><main_tabs open="structure browser pragmas query" current="3"/></window><tab_structure><column_width id="0" width="300"/><column_width id="1" width="0"/><column_width id="2" width="125"/><column_width id="3" width="2317"/><column_width id="4" width="0"/><expanded_item id="0" parent="1"/><expanded_item id="1" parent="1"/><expanded_item id="2" parent="1"/><expanded_item id="3" parent="1"/></tab_structure><tab_browse><current_table name="4,10:mainAppleStore"/><default_encoding codec=""/><browse_table_settings><table schema="main" name="AppleStore" show_row_id="0" encoding="" plot_x_axis="" unlock_view_pk="_rowid_"><sort/><column_widths><column index="1" value="53"/><column index="2" value="70"/><column index="3" value="300"/><column index="4" value="89"/><column index="5" value="77"/><column index="6" value="51"/><column index="7" value="131"/><column index="8" value="133"/><column index="9" value="95"/><column index="11" value="85"/><column index="12" value="95"/><column index="13" value="109"/><column index="14" value="134"/><column index="15" value="128"/><column index="16" value="81"/><column index="17" value="64"/></column_widths><filter_values/><conditional_formats/><row_id_formats/><display_formats/><hidden_columns/><plot_y_axes/><global_filter/></table><table schema="main" name="appleStore_description_combined" show_row_id="0" encoding="" plot_x_axis="" unlock_view_pk="_rowid_"><sort/><column_widths><column index="1" value="70"/><column index="2" value="300"/><column index="3" value="89"/><column index="4" value="300"/></column_widths><filter_values/><conditional_formats/><row_id_formats/><display_formats/><hidden_columns/><plot_y_axes/><global_filter/></table></browse_table_settings></tab_browse><tab_sql><sql name="Combine dataset">
+
+CREATE TABLE appleStore_description_combined AS
+
+SELECT * FROM appleStore_description1
+
+UNION ALL
+
+SELECT * FROM appleStore_description2
+
+UNION ALL
+
+SELECT * FROM appleStore_description3
+
+UNION ALL
+
+SELECT * FROM appleStore_description4</sql><sql name="EDA">******************************************************************   Exploratory Data Analys   ******************************************************************************************
+
+-- Check the number of unique apps in both tablesappStore 
+
+SELECT
+	COUNT (DISTINCT id) AS UNIQUEAppIDs
+FROM AppleStore
+----------------------------------------------------------
+SELECT
+	COUNT(DISTINCT id) AS UNIQUEAppIDs
+FROM appleStore_description_combined
+----------------------------------------------------------
+SELECT
+	COUNT (DISTINCT prime_genre)
+FROM 
+	AppleStore
+----------------------------------------------------------
+SELECT
+	COUNT ( prime_genre)
+FROM 
+	AppleStore
+
+	
+-- Check fo any missing values in key fields
+
+SELECT
+	COUNT(*)
+FROM
+	AppleStore
+WHERE
+	track_name is NULL | user_rating is NULL | prime_genre is NULL 
+--------------------------------------------------------------------
+SELECT
+	COUNT(*)
+FROM
+	appleStore_description_combined
+WHERE
+	app_desc is NULL 
+
+	
+--The number of apps per genre
+
+SELECT
+	prime_genre, 
+	count(*) AS &quot;Number of Apps&quot;
+FROM
+	AppleStore
+GROUP BY
+	prime_genre
+ORDER BY
+	&quot;Number of Apps&quot; DESC
+
+
+-- Get an overview of the app ratings
+
+SELECT
+	min(user_rating) AS &quot;MIN RATING&quot;,
+	max(user_rating) AS &quot;MAX RATING&quot;,
+	avg(user_rating) AS &quot;MEAN RATING&quot;
+FROM
+	AppleStore
+
+
+
+************************************************  INSIGHT: ACTUAL DATA ANALYSIS   **********************************************************************************************************
+
+-- Count the number of paid and free apps
+
+SELECT
+	CASE
+	WHEN price &gt; 0 THEN &quot;PAID&quot;
+	ELSE &quot;FREE&quot;
+	END AS App_Type,
+	COUNT (*) AS 'App Count'
+FROM 
+	AppleStore
+GROUP BY
+	App_Type
+
+
+-- Determine whether paid apps have higher ratings than free apps
+
+SELECT
+	CASE
+	WHEN price &gt; 0 THEN &quot;PAID&quot;
+	ELSE &quot;FREE&quot;
+	END AS 'App_Type',
+	COUNT (*) AS 'App Count',
+	round(avg(user_rating), 2) AS RATINGS_Free_Paid
+FROM 
+	AppleStore
+GROUP BY
+	App_Type
+
+
+-- Determine if apps with more languages have higher ratings
+
+SELECT
+	CASE
+	WHEN lang_num &lt; 10 THEN 'Less than 10 languages'
+	WHEN lang_num BETWEEN 10 AND 30  THEN 'Between 10-30 languages'
+	WHEN lang_num &gt; 30 THEN 'More than 30languages'
+	END AS Language_Bucket,
+	count (*) AS 'N',
+	round(avg(user_rating),2) AS RATING,
+	max(user_rating) AS MAX,
+	min(user_rating) AS MAX
+FROM 
+	AppleStore
+GROUP BY
+	Language_Bucket
+
+
+-- Check genres with low ratings
+
+SELECT
+	prime_genre,
+	avg(user_rating) AS RATING
+FROM 
+	AppleStore
+GROUP BY
+	prime_genre
+ORDER BY 
+	RATING ASC
+LIMIT 5
+
+
+-- Check correlation between app length description and user rating
+
+
+SELECT
+	CASE
+	WHEN length(b.app_desc) &lt; 500 THEN &quot;short description&quot;
+	WHEN length(b.app_desc) BETWEEN 500 AND 1000 THEN &quot;medium description&quot;
+	WHEN length(b.app_desc) &gt; 1000 THEN  &quot;long description&quot;
+	END AS Description_Bucket,
+	count (*) AS N,
+	round(avg(user_rating), 3) AS RATING
+FROM 
+	AppleStore AS a
+JOIN
+	appleStore_description_combined AS b
+ON
+	a.id = b.id
+Group by
+	Description_Bucket
+
+
+-- Check the top rated app for each genre
+
+SELECT
+	prime_genre,
+	track_name,
+	user_rating
+FROM
+	(
+	SELECT
+		prime_genre,
+		track_name,
+		user_rating,
+		RANK() OVER(PARTITION BY prime_genre ORDER BY user_rating DESC, rating_count_tot DESC) AS rank
+	FROM
+		AppleStore 
+	 ) AS a
+WHERE
+	a.rank = 1
+
+
+
+
+
+---------------------------------------RECOMMENDATION---------------------------------------------------------------------------
+-- Paid apps have better ratings
+-- Apps supporting  betweem 10 and 30 languages have better ratings
+-- Finance and books apps hav low ratings indiication marketing opportunity for new ventures
+-- Apps with longer description have better ratings
+-- A new app should aim for an average rating above 3.5
+-- Games and entertainment have high competition
+---------------------------------------RECOMMENDATION---------------------------------------------------------------------------
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+</sql><current_tab id="1"/></tab_sql></sqlb_project>
